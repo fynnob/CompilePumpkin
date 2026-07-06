@@ -1,0 +1,59 @@
+name: Build Pumpkin for Termux (glibc patched)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone Pumpkin
+        run: |
+          git clone --recurse-submodules --depth 1 --branch nightly https://github.com/Pumpkin-MC/Pumpkin.git pumpkin-src
+          cd pumpkin-src
+          echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Target standard Linux ARM64 instead of Android
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install AArch64 Linux Linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure Cargo
+        run: |
+          mkdir -p ~/.cargo
+          echo "[target.aarch64-unknown-linux-gnu]" >> ~/.cargo/config.toml
+          echo "linker = \"aarch64-linux-gnu-gcc\"" >> ~/.cargo/config.toml
+
+      - name: Dynamically Patch Negative Chunk Bug
+        working-directory: pumpkin-src
+        run: |
+          # Replace unsafe remainder math with safe Euclidean math across all Rust files
+          find . -name "*.rs" -type f -exec sed -i 's/% 16/.rem_euclid(16)/g' {} +
+          find . -name "*.rs" -type f -exec sed -i 's/% 32/.rem_euclid(32)/g' {} +
+
+      - name: Build (Standard Linux)
+        working-directory: pumpkin-src
+        # We can leave features/allocators enabled here, because glibc handles them fine
+        run: cargo build --release --target aarch64-unknown-linux-gnu --locked
+
+      - name: Package
+        run: |
+          mkdir out
+          cp pumpkin-src/target/aarch64-unknown-linux-gnu/release/pumpkin out/pumpkin-glibc-aarch64 || \
+          cp pumpkin-src/target/aarch64-unknown-linux-gnu/release/pumpkin-* out/ 2>/dev/null || true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}-${{ env.COMMIT }}
+          name: Pumpkin glibc-runner build ${{ env.COMMIT }}
+          files: out/*
