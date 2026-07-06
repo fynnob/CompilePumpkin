@@ -1,4 +1,4 @@
-name: Build Pumpkin for Termux (aarch64)
+name: Build Pumpkin for Termux (Native Android patched)
 
 on:
   workflow_dispatch:
@@ -35,11 +35,21 @@ jobs:
       - name: Force System Allocator (Bionic libc fix)
         working-directory: pumpkin-src
         run: |
-          # Strip custom allocators from Cargo.toml to prevent Bionic panics
-          sed -i 's/mimalloc = .*/# mimalloc removed/' Cargo.toml
-          sed -i 's/jemalloc = .*/# jemalloc removed/' Cargo.toml
-          sed -i 's/"mimalloc"//g' Cargo.toml
-          sed -i 's/"jemalloc"//g' Cargo.toml
+          # Strip custom allocators across all crates to prevent Android underflows
+          find . -name "Cargo.toml" -type f -exec sed -i 's/mimalloc = .*/# mimalloc removed/' {} +
+          find . -name "Cargo.toml" -type f -exec sed -i 's/jemalloc = .*/# jemalloc removed/' {} +
+          find . -name "Cargo.toml" -type f -exec sed -i 's/"mimalloc"//g' {} +
+          find . -name "Cargo.toml" -type f -exec sed -i 's/"jemalloc"//g' {} +
+
+      - name: Dynamically Patch Negative Chunk Bug
+        working-directory: pumpkin-src
+        run: |
+          # Replace unsafe modulo math with safe Euclidean math across all Rust files
+          find . -name "*.rs" -type f -exec sed -i 's/% 16/.rem_euclid(16)/g' {} +
+          find . -name "*.rs" -type f -exec sed -i 's/% 32/.rem_euclid(32)/g' {} +
+          
+          # Optional failsafe: cast dangerous 'as usize' conversions
+          find . -name "*.rs" -type f -exec sed -i 's/as usize/.unsigned_abs() as usize/g' {} +
 
       - name: Build
         working-directory: pumpkin-src
