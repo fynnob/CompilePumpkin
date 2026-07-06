@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Clone Pumpkin
         run: |
-          git clone --recurse-submodules --depth 1 https://github.com/Pumpkin-MC/Pumpkin.git pumpkin-src
+          git clone --recurse-submodules --depth 1 --branch nightly https://github.com/Pumpkin-MC/Pumpkin.git pumpkin-src
           cd pumpkin-src
           echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
