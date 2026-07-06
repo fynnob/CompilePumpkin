@@ -48,8 +48,6 @@ jobs:
           find . -name "*.rs" -type f -exec sed -i 's/% 16/.rem_euclid(16)/g' {} +
           find . -name "*.rs" -type f -exec sed -i 's/% 32/.rem_euclid(32)/g' {} +
           
-          # Optional failsafe: cast dangerous 'as usize' conversions
-          find . -name "*.rs" -type f -exec sed -i 's/as usize/.unsigned_abs() as usize/g' {} +
 
       - name: Build
         working-directory: pumpkin-src
