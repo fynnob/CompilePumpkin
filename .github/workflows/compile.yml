@@ -1,0 +1,48 @@
+name: Build Pumpkin for Termux (aarch64)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone Pumpkin
+        run: git clone --depth 1 https://github.com/Pumpkin-MC/Pumpkin.git pumpkin-src
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+
+      - name: Configure cargo for Android target
+        run: |
+          echo "[target.aarch64-linux-android]" >> ~/.cargo/config.toml
+          echo "linker = \"${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang\"" >> ~/.cargo/config.toml
+
+      - name: Build
+        working-directory: pumpkin-src
+        env:
+          CC_aarch64_linux_android: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
+          AR_aarch64_linux_android: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+        run: cargo build --release --target aarch64-linux-android
+
+      - name: Package
+        run: |
+          mkdir out
+          cp pumpkin-src/target/aarch64-linux-android/release/pumpkin out/pumpkin-termux-aarch64 || \
+          cp pumpkin-src/target/aarch64-linux-android/release/pumpkin-* out/ 2>/dev/null || true
+          cd pumpkin-src && echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}-${{ env.COMMIT }}
+          name: Pumpkin Termux build ${{ env.COMMIT }}
+          files: out/*
