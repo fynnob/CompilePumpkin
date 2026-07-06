@@ -3,12 +3,18 @@ name: Build Pumpkin for Termux (aarch64)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Clone Pumpkin
-        run: git clone --depth 1 https://github.com/Pumpkin-MC/Pumpkin.git pumpkin-src
+        run: |
+          git clone --recurse-submodules --depth 1 https://github.com/Pumpkin-MC/Pumpkin.git pumpkin-src
+          cd pumpkin-src
+          echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -26,6 +32,11 @@ jobs:
           echo "[target.aarch64-linux-android]" >> ~/.cargo/config.toml
           echo "linker = \"${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang\"" >> ~/.cargo/config.toml
 
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pumpkin-src -> target
+
       - name: Build
         working-directory: pumpkin-src
         env:
@@ -38,7 +49,6 @@ jobs:
           mkdir out
           cp pumpkin-src/target/aarch64-linux-android/release/pumpkin out/pumpkin-termux-aarch64 || \
           cp pumpkin-src/target/aarch64-linux-android/release/pumpkin-* out/ 2>/dev/null || true
-          cd pumpkin-src && echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
