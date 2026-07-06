@@ -32,10 +32,14 @@ jobs:
           echo "[target.aarch64-linux-android]" >> ~/.cargo/config.toml
           echo "linker = \"${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang\"" >> ~/.cargo/config.toml
 
-      - name: Cache cargo registry and build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: pumpkin-src -> target
+      - name: Force System Allocator (Bionic libc fix)
+        working-directory: pumpkin-src
+        run: |
+          # Strip custom allocators from Cargo.toml to prevent Bionic panics
+          sed -i 's/mimalloc = .*/# mimalloc removed/' Cargo.toml
+          sed -i 's/jemalloc = .*/# jemalloc removed/' Cargo.toml
+          sed -i 's/"mimalloc"//g' Cargo.toml
+          sed -i 's/"jemalloc"//g' Cargo.toml
 
       - name: Build
         working-directory: pumpkin-src
